@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard CETPRO Gabriela - Gestión de Alumnos</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- SheetJS CDN para Exportación Excel (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @media print {
+            header, section, .no-print, #confirm-modal, #toast-container, .action-buttons {
+                display: none !important;
+            }
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            #printable-area {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px !important;
+                font-size: 12px !important;
+                color: #000 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- Contenedor para Notificaciones Toast Flotantes -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Modal de Confirmación de Eliminación -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-100 transform scale-95 transition-transform duration-200" id="confirm-modal-card">
+            <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-center text-slate-800 mb-1">¿Eliminar Alumno?</h3>
+            <p class="text-xs text-slate-500 text-center mb-6">Esta acción borrará permanentemente la información del alumno en la base de datos de Firebase.</p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-delete" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition">Cancelar</button>
+                <button id="btn-confirm-delete" class="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700 shadow-lg shadow-rose-600/30 transition">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <!-- Navbar Superior / Encabezado -->
+        <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <!-- Botón para Volver al Menú Principal -->
+                    <a href="index.html" title="Volver al Menú Principal" class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition shadow-inner">
+                        <i class="fa-solid fa-house"></i>
+                    </a>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-tight">CETPRO Gabriela</h1>
+                        <p class="text-[11px] text-indigo-200">Sistema de Gestión de Alumnos</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 text-xs bg-indigo-800/70 px-3 py-1.5 rounded-full border border-indigo-500/30">
+                    <span id="db-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="db-status-text" class="font-medium text-indigo-100">Firebase Conectado</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido Principal -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+            <!-- KPIs / Tarjetas Estadísticas -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Alumnos</p>
+                        <h3 id="kpi-total" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-laptop-code"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Computación</p>
+                        <h3 id="kpi-computacion" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-scissors"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Corte y Confección</p>
+                        <h3 id="kpi-corte" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-spray-can-sparkles"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Peluquería / Barbería</p>
+                        <h3 id="kpi-peluqueria" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Trabajo: Formulario + Tabla -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- Formulario de Registro/Edición -->
+                <section class="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-20">
+                    <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <i id="form-icon" class="fa-solid fa-user-plus text-indigo-600"></i>
+                            <h2 id="form-title" class="font-bold text-slate-800 text-base">Registrar Alumno</h2>
+                        </div>
+                        <span id="badge-mode" class="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600">Nuevo</span>
+                    </div>
+
+                    <form id="alumno-form" class="space-y-4" novalidate>
+                        <input type="hidden" id="student-id">
+
+                        <div>
+                            <label for="dni" class="block text-xs font-semibold text-slate-600 uppercase mb-1">DNI (8 dígitos)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-id-card"></i>
+                                </span>
+                                <input type="text" id="dni" maxlength="8" placeholder="Ej. 72839401" required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <p id="dni-error" class="text-[11px] text-rose-500 mt-1 hidden">Debe ingresar un DNI válido de 8 dígitos.</p>
+                        </div>
+
+                        <div>
+                            <label for="nombres" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nombres</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-user"></i>
+                                </span>
+                                <input type="text" id="nombres" placeholder="Ej. María Elena" required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <p id="nombres-error" class="text-[11px] text-rose-500 mt-1 hidden">Este campo es obligatorio.</p>
+                        </div>
+
+                        <div>
+                            <label for="apellidos" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Apellidos</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-user"></i>
+                                </span>
+                                <input type="text" id="apellidos" placeholder="Ej. Torres Quispe" required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <p id="apellidos-error" class="text-[11px] text-rose-500 mt-1 hidden">Este campo es obligatorio.</p>
+                        </div>
+
+                        <div>
+                            <label for="programa" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Programa de Estudios</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-solid fa-graduation-cap"></i>
+                                </span>
+                                <select id="programa" required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition bg-white appearance-none">
+                                    <option value="" disabled selected>Seleccione un programa...</option>
+                                    <option value="computación">Computación</option>
+                                    <option value="corte y confección">Corte y Confección</option>
+                                    <option value="peluqueria y barberia">Peluquería y Barbería</option>
+                                </select>
+                                <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 text-xs pointer-events-none">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </span>
+                            </div>
+                            <p id="programa-error" class="text-[11px] text-rose-500 mt-1 hidden">Seleccione un programa válido.</p>
+                        </div>
+
+                        <div>
+                            <label for="celular" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Celular (9 dígitos)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-solid fa-mobile-screen-button"></i>
+                                </span>
+                                <input type="text" id="celular" maxlength="9" placeholder="Ej. 987654321" required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <p id="celular-error" class="text-[11px] text-rose-500 mt-1 hidden">Ingrese un celular de 9 dígitos que inicie con 9.</p>
+                        </div>
+
+                        <div class="pt-2 flex gap-2">
+                            <button type="submit" id="btn-submit"
+                                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition duration-150 flex items-center justify-center gap-2 text-sm">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Guardar Alumno</span>
+                            </button>
+
+                            <button type="button" id="btn-cancel" class="hidden px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition text-sm">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Tabla de Registros y Filtros -->
+                <section class="lg:col-span-8 space-y-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3 justify-between items-center">
+                        <div class="relative w-full md:w-64">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="search-input" placeholder="Buscar por DNI, Nombres..."
+                                class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs sm:text-sm">
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                            <select id="filter-program" class="py-2 px-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <option value="todos">Todos los programas</option>
+                                <option value="computación">Computación</option>
+                                <option value="corte y confección">Corte y Confección</option>
+                                <option value="peluqueria y barberia">Peluquería y Barbería</option>
+                            </select>
+
+                            <div class="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+                                <button id="btn-export-excel" title="Exportar a Excel" class="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-medium text-xs flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                    <span class="hidden sm:inline">Excel</span>
+                                </button>
+                                <button id="btn-print" title="Imprimir Lista" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-xs flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-print"></i>
+                                    <span class="hidden sm:inline">Imprimir</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="printable-area" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="hidden print:block p-4 border-b border-slate-200">
+                            <h1 class="text-xl font-bold">CETPRO Gabriela - Reporte General de Alumnos</h1>
+                            <p class="text-xs text-slate-500">Fecha de emisión: <span id="print-date"></span></p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        <th class="py-3.5 px-4">DNI</th>
+                                        <th class="py-3.5 px-4">Alumno</th>
+                                        <th class="py-3.5 px-4">Programa</th>
+                                        <th class="py-3.5 px-4">Celular</th>
+                                        <th class="py-3.5 px-4 text-center action-buttons">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alumnos-table-body" class="divide-y divide-slate-100 text-sm text-slate-700">
+                                    <tr>
+                                        <td colspan="5" class="py-12 text-center text-slate-400">
+                                            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-indigo-500 mb-2"></i>
+                                            <p class="text-xs">Conectando con Firestore...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="empty-state" class="hidden p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                            <p class="font-semibold text-slate-600 text-sm">No se encontraron registros</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Compruebe los filtros o registre un nuevo alumno.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <footer class="bg-white border-t border-slate-200/60 py-4 mt-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+            &copy; 2026 CETPRO Gabriela - Todos los derechos reservados. Conectado a la base de datos Firebase <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-600">cetpro-firebase-gabriela</code>.
+        </div>
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            doc,
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyABgLKby-CmtgBxyKkyAz2B9SiuVPXwixE",
+            authDomain: "cetpro-firebase-gabriela.firebaseapp.com",
+            projectId: "cetpro-firebase-gabriela",
+            storageBucket: "cetpro-firebase-gabriela.firebasestorage.app",
+            messagingSenderId: "274943270322",
+            appId: "1:274943270322:web:2c9ccd8f5cdc9d0f6b58ab"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const alumnosCollection = collection(db, "alumnos");
+
+        let alumnosData = [];
+        let itemToDeleteId = null;
+
+        const form = document.getElementById("alumno-form");
+        const studentIdInput = document.getElementById("student-id");
+        const dniInput = document.getElementById("dni");
+        const nombresInput = document.getElementById("nombres");
+        const apellidosInput = document.getElementById("apellidos");
+        const programaInput = document.getElementById("programa");
+        const celularInput = document.getElementById("celular");
+
+        const btnSubmit = document.getElementById("btn-submit");
+        const btnCancel = document.getElementById("btn-cancel");
+        const formTitle = document.getElementById("form-title");
+        const formIcon = document.getElementById("form-icon");
+        const badgeMode = document.getElementById("badge-mode");
+
+        const tableBody = document.getElementById("alumnos-table-body");
+        const emptyState = document.getElementById("empty-state");
+        const searchInput = document.getElementById("search-input");
+        const filterProgram = document.getElementById("filter-program");
+
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmModalCard = document.getElementById("confirm-modal-card");
+        const btnConfirmDelete = document.getElementById("btn-confirm-delete");
+        const btnCancelDelete = document.getElementById("btn-cancel-delete");
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
+            const iconClass = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info');
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-xs font-semibold pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass} text-base"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        dniInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
+        celularInput.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
+
+        function validateForm() {
+            let isValid = true;
+            const dniVal = dniInput.value.trim();
+            const dniError = document.getElementById('dni-error');
+            if (!/^\d{8}$/.test(dniVal)) {
+                dniError.classList.remove('hidden');
+                dniInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                dniError.classList.add('hidden');
+                dniInput.classList.remove('border-rose-500');
+            }
+
+            const nombresVal = nombresInput.value.trim();
+            const nombresError = document.getElementById('nombres-error');
+            if (nombresVal === '') {
+                nombresError.classList.remove('hidden');
+                nombresInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                nombresError.classList.add('hidden');
+                nombresInput.classList.remove('border-rose-500');
+            }
+
+            const apellidosVal = apellidosInput.value.trim();
+            const apellidosError = document.getElementById('apellidos-error');
+            if (apellidosVal === '') {
+                apellidosError.classList.remove('hidden');
+                apellidosInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                apellidosError.classList.add('hidden');
+                apellidosInput.classList.remove('border-rose-500');
+            }
+
+            const programaVal = programaInput.value;
+            const programaError = document.getElementById('programa-error');
+            if (!programaVal) {
+                programaError.classList.remove('hidden');
+                programaInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                programaError.classList.add('hidden');
+                programaInput.classList.remove('border-rose-500');
+            }
+
+            const celularVal = celularInput.value.trim();
+            const celularError = document.getElementById('celular-error');
+            if (!/^9\d{8}$/.test(celularVal)) {
+                celularError.classList.remove('hidden');
+                celularInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                celularError.classList.add('hidden');
+                celularInput.classList.remove('border-rose-500');
+            }
+
+            return isValid;
+        }
+
+        function resetValidation() {
+            ['dni-error', 'nombres-error', 'apellidos-error', 'programa-error', 'celular-error'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            [dniInput, nombresInput, apellidosInput, programaInput, celularInput].forEach(inp => {
+                inp.classList.remove('border-rose-500');
+            });
+        }
+
+        function resetForm() {
+            form.reset();
+            studentIdInput.value = "";
+            resetValidation();
+
+            formTitle.textContent = "Registrar Alumno";
+            formIcon.className = "fa-solid fa-user-plus text-indigo-600";
+            badgeMode.textContent = "Nuevo";
+            badgeMode.className = "text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600";
+            
+            btnSubmit.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span>Guardar Alumno</span>`;
+            btnCancel.classList.add("hidden");
+        }
+
+        btnCancel.addEventListener("click", resetForm);
+
+        window.editStudent = function(id) {
+            const student = alumnosData.find(a => a.id === id);
+            if (!student) return;
+
+            studentIdInput.value = student.id;
+            dniInput.value = student.dni || '';
+            nombresInput.value = student.nombres || '';
+            apellidosInput.value = student.apellidos || '';
+            programaInput.value = student.programa || '';
+            celularInput.value = student.celular || '';
+
+            resetValidation();
+
+            formTitle.textContent = "Editar Alumno";
+            formIcon.className = "fa-solid fa-user-pen text-amber-600";
+            badgeMode.textContent = "Edición";
+            badgeMode.className = "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-600";
+
+            btnSubmit.innerHTML = `<i class="fa-solid fa-pen-to-square"></i> <span>Actualizar Alumno</span>`;
+            btnCancel.classList.remove("hidden");
+
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!validateForm()) return;
+
+            const isEdit = Boolean(studentIdInput.value);
+            const payload = {
+                dni: dniInput.value.trim(),
+                nombres: nombresInput.value.trim(),
+                apellidos: apellidosInput.value.trim(),
+                programa: programaInput.value,
+                celular: celularInput.value.trim(),
+                fechaActualizacion: serverTimestamp()
+            };
+
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70');
+
+            try {
+                if (isEdit) {
+                    const docRef = doc(db, "alumnos", studentIdInput.value);
+                    await updateDoc(docRef, payload);
+                    showToast("Registro de alumno actualizado correctamente", "success");
+                } else {
+                    payload.fechaCreacion = serverTimestamp();
+                    await addDoc(alumnosCollection, payload);
+                    showToast("Alumno registrado exitosamente en el sistema", "success");
+                }
+                resetForm();
+            } catch (err) {
+                console.error("Error al procesar en Firebase:", err);
+                showToast("Error al guardar la información", "error");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70');
+            }
+        });
+
+        window.promptDeleteStudent = function(id) {
+            itemToDeleteId = id;
+            confirmModal.classList.remove("hidden");
+            setTimeout(() => {
+                confirmModal.classList.remove("opacity-0");
+                confirmModalCard.classList.remove("scale-95");
+            }, 10);
+        };
+
+        function closeDeleteModal() {
+            confirmModal.classList.add("opacity-0");
+            confirmModalCard.classList.add("scale-95");
+            setTimeout(() => {
+                confirmModal.classList.add("hidden");
+                itemToDeleteId = null;
+            }, 200);
+        }
+
+        btnCancelDelete.addEventListener("click", closeDeleteModal);
+
+        btnConfirmDelete.addEventListener("click", async () => {
+            if (!itemToDeleteId) return;
+            try {
+                await deleteDoc(doc(db, "alumnos", itemToDeleteId));
+                showToast("Alumno eliminado del sistema", "success");
+                if (studentIdInput.value === itemToDeleteId) resetForm();
+            } catch (err) {
+                console.error("Error al eliminar:", err);
+                showToast("No se pudo eliminar el registro", "error");
+            } finally {
+                closeDeleteModal();
+            }
+        });
+
+        function getFilteredStudents() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const filterProg = filterProgram.value;
+
+            return alumnosData.filter(student => {
+                const matchesSearch = 
+                    (student.dni && student.dni.toLowerCase().includes(searchTerm)) ||
+                    (student.nombres && student.nombres.toLowerCase().includes(searchTerm)) ||
+                    (student.apellidos && student.apellidos.toLowerCase().includes(searchTerm));
+
+                const matchesProgram = filterProg === "todos" || student.programa === filterProg;
+                return matchesSearch && matchesProgram;
+            });
+        }
+
+        function renderDashboard() {
+            const filtered = getFilteredStudents();
+
+            document.getElementById("kpi-total").textContent = alumnosData.length;
+            document.getElementById("kpi-computacion").textContent = alumnosData.filter(a => a.programa === 'computación').length;
+            document.getElementById("kpi-corte").textContent = alumnosData.filter(a => a.programa === 'corte y confección').length;
+            document.getElementById("kpi-peluqueria").textContent = alumnosData.filter(a => a.programa === 'peluqueria y barberia').length;
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = "";
+                emptyState.classList.remove("hidden");
+                return;
+            }
+
+            emptyState.classList.add("hidden");
+
+            tableBody.innerHTML = filtered.map(student => {
+                let badgeClass = "bg-slate-100 text-slate-700";
+                let progName = student.programa || "N/A";
+
+                if (student.programa === "computación") {
+                    badgeClass = "bg-blue-50 text-blue-700 border border-blue-200/60";
+                    progName = "Computación";
+                } else if (student.programa === "corte y confección") {
+                    badgeClass = "bg-amber-50 text-amber-700 border border-amber-200/60";
+                    progName = "Corte y Confección";
+                } else if (student.programa === "peluqueria y barberia") {
+                    badgeClass = "bg-rose-50 text-rose-700 border border-rose-200/60";
+                    progName = "Peluquería y Barbería";
+                }
+
+                const whatsappUrl = `https://wa.me/51${student.celular}?text=${encodeURIComponent(`Estimado(a) ${student.nombres}, le saludamos del CETPRO Gabriela.`)}`;
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition duration-150">
+                        <td class="py-3 px-4 font-mono font-medium text-slate-600 text-xs">${student.dni || '-'}</td>
+                        <td class="py-3 px-4">
+                            <div class="font-semibold text-slate-800">${student.nombres || ''} ${student.apellidos || ''}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                                ${progName}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-mono text-slate-600 text-xs">
+                            ${student.celular || '-'}
+                        </td>
+                        <td class="py-3 px-4 text-center action-buttons">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <a href="${whatsappUrl}" target="_blank" title="Enviar mensaje por WhatsApp"
+                                   class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition duration-150 text-xs">
+                                    <i class="fa-brands fa-whatsapp text-sm"></i>
+                                </a>
+                                <button onclick="editStudent('${student.id}')" title="Editar registro"
+                                        class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition duration-150 text-xs">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="promptDeleteStudent('${student.id}')" title="Eliminar alumno"
+                                        class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition duration-150 text-xs">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        searchInput.addEventListener("input", renderDashboard);
+        filterProgram.addEventListener("change", renderDashboard);
+
+        document.getElementById("btn-export-excel").addEventListener("click", () => {
+            const filtered = getFilteredStudents();
+            if (filtered.length === 0) {
+                showToast("No hay registros para exportar", "error");
+                return;
+            }
+
+            const exportData = filtered.map((item, index) => ({
+                "N°": index + 1,
+                "DNI": item.dni,
+                "Nombres": item.nombres,
+                "Apellidos": item.apellidos,
+                "Programa de Estudios": item.programa,
+                "Celular": item.celular
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Alumnos");
+            
+            XLSX.writeFile(workbook, `CETPRO_Gabriela_Alumnos_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast("Reporte descargado correctamente", "success");
+        });
+
+        document.getElementById("btn-print").addEventListener("click", () => {
+            document.getElementById("print-date").textContent = new Date().toLocaleString('es-PE');
+            window.print();
+        });
+
+        onSnapshot(alumnosCollection, (snapshot) => {
+            alumnosData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            renderDashboard();
+        }, (error) => {
+            console.error("Error Firebase:", error);
+            document.getElementById("db-status-dot").className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+            document.getElementById("db-status-text").textContent = "Error de Conexión";
+            showToast("Ocurrió un error con la conexión a Firestore", "error");
+        });
+    </script>
+</body>
+</html>

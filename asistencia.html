@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Asistencia - CETPRO Gabriela</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- SheetJS CDN para Exportación Excel (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @media print {
+            header, section, .no-print, #confirm-modal, #toast-container, .action-buttons {
+                display: none !important;
+            }
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            #printable-area {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px !important;
+                font-size: 11px !important;
+                color: #000 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- Contenedor para Notificaciones Toast Flotantes -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Modal de Confirmación de Eliminación -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-100 transform scale-95 transition-transform duration-200" id="confirm-modal-card">
+            <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-center text-slate-800 mb-1">¿Eliminar Registro?</h3>
+            <p class="text-xs text-slate-500 text-center mb-6">Esta acción borrará la marca de asistencia seleccionada de la base de datos de Firebase.</p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-delete" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition">Cancelar</button>
+                <button id="btn-confirm-delete" class="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700 shadow-lg shadow-rose-600/30 transition">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <!-- Navbar Superior / Encabezado -->
+        <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <!-- Botón para Volver al Menú Principal -->
+                    <a href="index.html" title="Volver al Menú Principal" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 hover:bg-slate-700 transition shadow-inner">
+                        <i class="fa-solid fa-house"></i>
+                    </a>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-tight flex items-center gap-2">
+                            CETPRO Gabriela 
+                            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold border border-emerald-500/30">Asistencia</span>
+                        </h1>
+                        <p class="text-[11px] text-slate-400">Control Diario de Entradas y Salidas</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="hidden sm:flex flex-col items-end border-r border-slate-800 pr-4">
+                        <span id="live-time" class="font-mono text-base font-bold text-emerald-400 leading-none">00:00:00 AM</span>
+                        <span id="live-date" class="text-[10px] text-slate-400 mt-1 capitalize">Cargando fecha...</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                        <span id="db-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="db-status-text" class="font-medium text-slate-300">Conectado</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido Principal -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-gradient-to-br from-slate-900 to-indigo-950 p-5 rounded-2xl shadow-md border border-slate-800 text-white flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">Tiempo Real</span>
+                        <i class="fa-solid fa-clock text-indigo-400 text-sm"></i>
+                    </div>
+                    <div class="my-2">
+                        <h2 id="card-live-time" class="text-2xl font-black font-mono tracking-tight text-emerald-400">00:00:00</h2>
+                        <p id="card-live-date" class="text-xs text-slate-300 capitalize mt-0.5">--</p>
+                    </div>
+                    <p class="text-[10px] text-slate-400 flex items-center gap-1">
+                        <i class="fa-solid fa-shield-check text-emerald-400"></i> Servidor sincronizado
+                    </p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Hoy</p>
+                        <h3 id="kpi-today-total" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-user-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Presentes</p>
+                        <h3 id="kpi-today-presentes" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-user-clock"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tardanzas</p>
+                        <h3 id="kpi-today-tardanzas" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-file-signature"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Justificados</p>
+                        <h3 id="kpi-today-justificados" class="text-2xl font-bold text-slate-800">0</h3>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <section class="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-20">
+                    <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user-check text-emerald-600"></i>
+                            <h2 class="font-bold text-slate-800 text-base">Marcar Asistencia</h2>
+                        </div>
+                        <span class="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Entrada</span>
+                    </div>
+
+                    <form id="asistencia-form" class="space-y-4" novalidate>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="dni" class="block text-xs font-semibold text-slate-600 uppercase">DNI del Alumno</label>
+                                <span id="auto-status" class="text-[10px] text-indigo-600 hidden flex items-center gap-1 font-medium">
+                                    <i class="fa-solid fa-circle-check"></i> Alumno encontrado
+                                </span>
+                            </div>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-id-card"></i>
+                                </span>
+                                <input type="text" id="dni" maxlength="8" placeholder="Ingrese 8 dígitos de DNI..." required
+                                    class="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm transition">
+                                <span id="dni-spinner" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 text-xs hidden">
+                                    <i class="fa-solid fa-circle-notch animate-spin text-emerald-600"></i>
+                                </span>
+                            </div>
+                            <p id="dni-error" class="text-[11px] text-rose-500 mt-1 hidden">Ingrese un DNI válido de 8 dígitos.</p>
+                        </div>
+
+                        <div>
+                            <label for="nombre" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nombres y Apellidos</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-user"></i>
+                                </span>
+                                <input type="text" id="nombre" placeholder="Nombre completo..." required
+                                    class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm transition bg-slate-50/50">
+                            </div>
+                            <p id="nombre-error" class="text-[11px] text-rose-500 mt-1 hidden">El nombre es obligatorio.</p>
+                        </div>
+
+                        <div>
+                            <label for="estado" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Estado de Asistencia</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="estado" value="Presente" checked class="peer sr-only">
+                                    <div class="p-2 text-center rounded-xl border border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:bg-slate-50 transition text-xs font-semibold text-slate-600 flex flex-col items-center gap-1">
+                                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                                        <span>Presente</span>
+                                    </div>
+                                </label>
+
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="estado" value="Tardanza" class="peer sr-only">
+                                    <div class="p-2 text-center rounded-xl border border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 hover:bg-slate-50 transition text-xs font-semibold text-slate-600 flex flex-col items-center gap-1">
+                                        <i class="fa-solid fa-clock text-amber-500"></i>
+                                        <span>Tardanza</span>
+                                    </div>
+                                </label>
+
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="estado" value="Falta Justificada" class="peer sr-only">
+                                    <div class="p-2 text-center rounded-xl border border-slate-200 peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 hover:bg-slate-50 transition text-xs font-semibold text-slate-600 flex flex-col items-center gap-1">
+                                        <i class="fa-solid fa-file-medical text-sky-500"></i>
+                                        <span>Justificada</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="observacion" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Observaciones (Opcional)</label>
+                            <div class="relative">
+                                <span class="absolute top-3 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                    <i class="fa-regular fa-comment-dots"></i>
+                                </span>
+                                <textarea id="observacion" rows="2" placeholder="Ej: Presentó documento o llegó 15m tarde..."
+                                    class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm transition"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                            <span class="flex items-center gap-1.5 font-medium">
+                                <i class="fa-solid fa-calendar-day text-indigo-500"></i>
+                                Registro con fecha de hoy
+                            </span>
+                            <span id="form-time-preview" class="font-mono font-bold text-slate-700">00:00 AM</span>
+                        </div>
+
+                        <button type="submit" id="btn-submit"
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-600/30 transition duration-150 flex items-center justify-center gap-2 text-sm">
+                            <i class="fa-solid fa-check"></i>
+                            <span>Registrar Asistencia</span>
+                        </button>
+                    </form>
+                </section>
+
+                <section class="lg:col-span-8 space-y-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3 justify-between items-center">
+                        <div class="relative w-full md:w-52">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="search-input" placeholder="Buscar DNI o Nombre..."
+                                class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm">
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                            <select id="filter-date-range" class="py-2 px-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+                                <option value="hoy" selected>Asistencias de Hoy</option>
+                                <option value="este-mes">Este Mes</option>
+                                <option value="todos">Histórico Completo</option>
+                                <option value="custom">Fecha Específica</option>
+                            </select>
+
+                            <input type="date" id="filter-custom-date" class="hidden py-2 px-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+
+                            <select id="filter-status" class="py-2 px-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+                                <option value="todos">Todos los Estados</option>
+                                <option value="Presente">Presentes</option>
+                                <option value="Tardanza">Tardanzas</option>
+                                <option value="Falta Justificada">Justificadas</option>
+                            </select>
+
+                            <div class="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+                                <button id="btn-export-excel" title="Exportar a Excel" class="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-medium text-xs flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                    <span class="hidden sm:inline">Excel</span>
+                                </button>
+                                <button id="btn-print" title="Imprimir Asistencias" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-xs flex items-center gap-1.5 transition">
+                                    <i class="fa-solid fa-print"></i>
+                                    <span class="hidden sm:inline">Imprimir</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="printable-area" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="hidden print:block p-4 border-b border-slate-200">
+                            <h1 class="text-xl font-bold">CETPRO Gabriela - Reporte Control de Asistencia</h1>
+                            <p class="text-xs text-slate-500">Fecha de emisión: <span id="print-date"></span></p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        <th class="py-3.5 px-4">Fecha y Hora</th>
+                                        <th class="py-3.5 px-4">DNI</th>
+                                        <th class="py-3.5 px-4">Alumno</th>
+                                        <th class="py-3.5 px-4">Estado</th>
+                                        <th class="py-3.5 px-4">Observación</th>
+                                        <th class="py-3.5 px-4 text-center action-buttons">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="asistencia-table-body" class="divide-y divide-slate-100 text-sm text-slate-700">
+                                    <tr>
+                                        <td colspan="6" class="py-12 text-center text-slate-400">
+                                            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-emerald-500 mb-2"></i>
+                                            <p class="text-xs">Sincronizando asistencias con Firebase...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="empty-state" class="hidden p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-calendar-xmark text-4xl mb-3 text-slate-300"></i>
+                            <p class="font-semibold text-slate-600 text-sm">No hay marcas de asistencia registrados</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Compruebe los filtros de búsqueda o fecha seleccionada.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <footer class="bg-white border-t border-slate-200/60 py-4 mt-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+            &copy; 2026 CETPRO Gabriela - Sistema de Control de Asistencia. Conectado a la colección <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-600">asistencias</code> de Firebase.
+        </div>
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            deleteDoc, 
+            doc,
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyABgLKby-CmtgBxyKkyAz2B9SiuVPXwixE",
+            authDomain: "cetpro-firebase-gabriela.firebaseapp.com",
+            projectId: "cetpro-firebase-gabriela",
+            storageBucket: "cetpro-firebase-gabriela.firebasestorage.app",
+            messagingSenderId: "274943270322",
+            appId: "1:274943270322:web:2c9ccd8f5cdc9d0f6b58ab"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const asistenciasCollection = collection(db, "asistencias");
+        const alumnosCollection = collection(db, "alumnos");
+
+        let asistenciasData = [];
+        let alumnosCache = [];
+        let itemToDeleteId = null;
+
+        const form = document.getElementById("asistencia-form");
+        const dniInput = document.getElementById("dni");
+        const nombreInput = document.getElementById("nombre");
+        const obsInput = document.getElementById("observacion");
+        const autoStatus = document.getElementById("auto-status");
+        const dniSpinner = document.getElementById("dni-spinner");
+        const btnSubmit = document.getElementById("btn-submit");
+
+        const tableBody = document.getElementById("asistencia-table-body");
+        const emptyState = document.getElementById("empty-state");
+        const searchInput = document.getElementById("search-input");
+        const filterDateRange = document.getElementById("filter-date-range");
+        const filterCustomDate = document.getElementById("filter-custom-date");
+        const filterStatus = document.getElementById("filter-status");
+
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmModalCard = document.getElementById("confirm-modal-card");
+        const btnConfirmDelete = document.getElementById("btn-confirm-delete");
+        const btnCancelDelete = document.getElementById("btn-cancel-delete");
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const dateStr = now.toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            document.getElementById("live-time").textContent = timeStr;
+            document.getElementById("live-date").textContent = dateStr;
+            document.getElementById("card-live-time").textContent = timeStr;
+            document.getElementById("card-live-date").textContent = dateStr;
+            document.getElementById("form-time-preview").textContent = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
+            const iconClass = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info');
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-xs font-semibold pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass} text-base"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        onSnapshot(alumnosCollection, (snapshot) => {
+            alumnosCache = snapshot.docs.map(doc => doc.data());
+        });
+
+        dniInput.addEventListener("input", (e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            e.target.value = val;
+            if (val.length === 8) {
+                lookupAlumno(val);
+            } else {
+                autoStatus.classList.add("hidden");
+            }
+        });
+
+        function lookupAlumno(dniVal) {
+            dniSpinner.classList.remove("hidden");
+            setTimeout(() => {
+                const matched = alumnosCache.find(a => a.dni === dniVal);
+                dniSpinner.classList.add("hidden");
+                if (matched) {
+                    nombreInput.value = `${matched.nombres} ${matched.apellidos}`.trim();
+                    autoStatus.classList.remove("hidden");
+                } else {
+                    autoStatus.classList.add("hidden");
+                }
+            }, 150);
+        }
+
+        function validateForm() {
+            let isValid = true;
+            const dniVal = dniInput.value.trim();
+            const dniError = document.getElementById('dni-error');
+            if (!/^\d{8}$/.test(dniVal)) {
+                dniError.classList.remove('hidden');
+                dniInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                dniError.classList.add('hidden');
+                dniInput.classList.remove('border-rose-500');
+            }
+
+            const nombreVal = nombreInput.value.trim();
+            const nombreError = document.getElementById('nombre-error');
+            if (nombreVal === '') {
+                nombreError.classList.remove('hidden');
+                nombreInput.classList.add('border-rose-500');
+                isValid = false;
+            } else {
+                nombreError.classList.add('hidden');
+                nombreInput.classList.remove('border-rose-500');
+            }
+            return isValid;
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!validateForm()) return;
+
+            const now = new Date();
+            const fechaISO = now.toISOString().slice(0, 10);
+            const horaStr = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const estadoSelected = document.querySelector('input[name="estado"]:checked')?.value || "Presente";
+
+            const payload = {
+                dni: dniInput.value.trim(),
+                nombre: nombreInput.value.trim(),
+                estado: estadoSelected,
+                observacion: obsInput.value.trim(),
+                fecha: fechaISO,
+                hora: horaStr,
+                timestamp: serverTimestamp()
+            };
+
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70');
+
+            try {
+                await addDoc(asistenciasCollection, payload);
+                showToast(`Asistencia de ${payload.nombre} registrada correctamente`, "success");
+                dniInput.value = "";
+                nombreInput.value = "";
+                obsInput.value = "";
+                autoStatus.classList.add("hidden");
+                document.querySelector('input[name="estado"][value="Presente"]').checked = true;
+                dniInput.focus();
+            } catch (err) {
+                console.error("Error al registrar asistencia:", err);
+                showToast("Error al guardar en la base de datos", "error");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70');
+            }
+        });
+
+        window.promptDeleteAsistencia = function(id) {
+            itemToDeleteId = id;
+            confirmModal.classList.remove("hidden");
+            setTimeout(() => {
+                confirmModal.classList.remove("opacity-0");
+                confirmModalCard.classList.remove("scale-95");
+            }, 10);
+        };
+
+        function closeDeleteModal() {
+            confirmModal.classList.add("opacity-0");
+            confirmModalCard.classList.add("scale-95");
+            setTimeout(() => {
+                confirmModal.classList.add("hidden");
+                itemToDeleteId = null;
+            }, 200);
+        }
+
+        btnCancelDelete.addEventListener("click", closeDeleteModal);
+
+        btnConfirmDelete.addEventListener("click", async () => {
+            if (!itemToDeleteId) return;
+            try {
+                await deleteDoc(doc(db, "asistencias", itemToDeleteId));
+                showToast("Registro de asistencia eliminado", "success");
+            } catch (err) {
+                console.error("Error al eliminar:", err);
+                showToast("No se pudo eliminar el registro", "error");
+            } finally {
+                closeDeleteModal();
+            }
+        });
+
+        filterDateRange.addEventListener("change", (e) => {
+            if (e.target.value === "custom") {
+                filterCustomDate.classList.remove("hidden");
+                filterCustomDate.value = new Date().toISOString().slice(0, 10);
+            } else {
+                filterCustomDate.classList.add("hidden");
+            }
+            renderDashboard();
+        });
+
+        filterCustomDate.addEventListener("change", renderDashboard);
+        filterStatus.addEventListener("change", renderDashboard);
+        searchInput.addEventListener("input", renderDashboard);
+
+        function getFilteredAsistencias() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const range = filterDateRange.value;
+            const customDate = filterCustomDate.value;
+            const selectedStatus = filterStatus.value;
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const currentMonthISO = new Date().toISOString().slice(0, 7);
+
+            return asistenciasData.filter(item => {
+                const matchesSearch = 
+                    (item.dni && item.dni.toLowerCase().includes(searchTerm)) ||
+                    (item.nombre && item.nombre.toLowerCase().includes(searchTerm));
+
+                const matchesStatus = selectedStatus === "todos" || item.estado === selectedStatus;
+
+                let matchesDate = true;
+                if (range === "hoy") {
+                    matchesDate = item.fecha === todayISO;
+                } else if (range === "este-mes") {
+                    matchesDate = item.fecha && item.fecha.startsWith(currentMonthISO);
+                } else if (range === "custom") {
+                    matchesDate = item.fecha === customDate;
+                }
+                return matchesSearch && matchesStatus && matchesDate;
+            });
+        }
+
+        function renderDashboard() {
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const todayRecords = asistenciasData.filter(a => a.fecha === todayISO);
+            document.getElementById("kpi-today-total").textContent = todayRecords.length;
+            document.getElementById("kpi-today-presentes").textContent = todayRecords.filter(a => a.estado === 'Presente').length;
+            document.getElementById("kpi-today-tardanzas").textContent = todayRecords.filter(a => a.estado === 'Tardanza').length;
+            document.getElementById("kpi-today-justificados").textContent = todayRecords.filter(a => a.estado === 'Falta Justificada').length;
+
+            const filtered = getFilteredAsistencias();
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = "";
+                emptyState.classList.remove("hidden");
+                return;
+            }
+
+            emptyState.classList.add("hidden");
+
+            filtered.sort((a, b) => {
+                if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
+                return (b.hora || '').localeCompare(a.hora || '');
+            });
+
+            tableBody.innerHTML = filtered.map(item => {
+                let badgeClass = "bg-slate-100 text-slate-700";
+                let icon = "fa-circle-check";
+
+                if (item.estado === "Presente") {
+                    badgeClass = "bg-emerald-50 text-emerald-700 border border-emerald-200/60";
+                    icon = "fa-circle-check text-emerald-500";
+                } else if (item.estado === "Tardanza") {
+                    badgeClass = "bg-amber-50 text-amber-700 border border-amber-200/60";
+                    icon = "fa-clock text-amber-500";
+                } else if (item.estado === "Falta Justificada") {
+                    badgeClass = "bg-sky-50 text-sky-700 border border-sky-200/60";
+                    icon = "fa-file-medical text-sky-500";
+                }
+
+                let fechaFormateada = item.fecha || 'N/A';
+                if (item.fecha) {
+                    const [y, m, d] = item.fecha.split('-');
+                    fechaFormateada = `${d}/${m}/${y}`;
+                }
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition duration-150">
+                        <td class="py-3 px-4">
+                            <div class="font-medium text-slate-800 text-xs">${fechaFormateada}</div>
+                            <div class="text-[11px] font-mono text-slate-400">${item.hora || '--'}</div>
+                        </td>
+                        <td class="py-3 px-4 font-mono text-slate-600 text-xs">${item.dni || '-'}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-800">${item.nombre || 'Sin nombre'}</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                                <i class="fa-solid ${icon}"></i>
+                                ${item.estado}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-xs text-slate-500 max-w-xs truncate">
+                            ${item.observacion ? item.observacion : '<span class="text-slate-300 italic">Ninguna</span>'}
+                        </td>
+                        <td class="py-3 px-4 text-center action-buttons">
+                            <button onclick="promptDeleteAsistencia('${item.id}')" title="Eliminar marca de asistencia"
+                                    class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition duration-150 text-xs mx-auto">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.getElementById("btn-export-excel").addEventListener("click", () => {
+            const filtered = getFilteredAsistencias();
+            if (filtered.length === 0) {
+                showToast("No hay datos de asistencia para exportar", "error");
+                return;
+            }
+
+            const exportData = filtered.map((item, index) => ({
+                "N°": index + 1,
+                "Fecha": item.fecha,
+                "Hora": item.hora,
+                "DNI": item.dni,
+                "Alumno": item.nombre,
+                "Estado": item.estado,
+                "Observación": item.observacion || ""
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencias");
+            
+            XLSX.writeFile(workbook, `CETPRO_Asistencia_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast("Reporte de Asistencia exportado a Excel", "success");
+        });
+
+        document.getElementById("btn-print").addEventListener("click", () => {
+            document.getElementById("print-date").textContent = new Date().toLocaleString('es-PE');
+            window.print();
+        });
+
+        onSnapshot(asistenciasCollection, (snapshot) => {
+            asistenciasData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            renderDashboard();
+        }, (error) => {
+            console.error("Error Firestore Asistencias:", error);
+            document.getElementById("db-status-dot").className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+            document.getElementById("db-status-text").textContent = "Error Conexión";
+            showToast("Error al conectar con la base de datos de asistencias", "error");
+        });
+    </script>
+</body>
+</html>

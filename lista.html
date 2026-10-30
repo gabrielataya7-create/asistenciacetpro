@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CETPRO General Attendance Registry</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-table {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased flex flex-col justify-between">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <!-- Botón para Volver al Menú Principal -->
+                <a href="index.html" title="Volver al Menú Principal" class="w-10 h-10 rounded-xl bg-slate-700/80 border border-slate-600 flex items-center justify-center text-sky-400 hover:bg-slate-700 transition shadow-inner">
+                    <i class="fa-solid fa-house"></i>
+                </a>
+                <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid font-bold fa-clipboard-user text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white leading-none">CETPRO Gabriela</h1>
+                    <p class="text-xs text-slate-400 mt-1">Listado General de Asistencias</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <div class="hidden sm:flex items-center space-x-2 bg-slate-900/60 border border-slate-700/50 rounded-lg px-3 py-1.5 text-xs text-slate-300">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="connection-status">Firestore Conectado</span>
+                </div>
+                <button onclick="openManualRegisterModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition-all shadow-md shadow-sky-600/30 flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">Nuevo Registro</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Body -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 backdrop-blur shadow-sm hover:border-slate-600 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Registros</p>
+                        <h3 id="stat-total" class="text-3xl font-bold text-white mt-2">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-database"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left mr-1.5 text-sky-400"></i> Histórico almacenado
+                </p>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 backdrop-blur shadow-sm hover:border-slate-600 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Asistencias Hoy</p>
+                        <h3 id="stat-today" class="text-3xl font-bold text-emerald-400 mt-2">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 flex items-center">
+                    <i class="fa-solid fa-circle-check mr-1.5 text-emerald-400"></i> Registrados la fecha actual
+                </p>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 backdrop-blur shadow-sm hover:border-slate-600 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tardanzas Hoy</p>
+                        <h3 id="stat-tardanzas" class="text-3xl font-bold text-amber-400 mt-2">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-user-clock"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 flex items-center">
+                    <i class="fa-solid fa-triangle-exclamation mr-1.5 text-amber-400"></i> Fuera de horario regular
+                </p>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 backdrop-blur shadow-sm hover:border-slate-600 transition">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Programas Activos</p>
+                        <h3 id="stat-programas" class="text-3xl font-bold text-indigo-400 mt-2">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 flex items-center">
+                    <i class="fa-solid fa-book-open mr-1.5 text-indigo-400"></i> Especialidades involucradas
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 mb-6 shadow-xl no-print">
+            <div class="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+                
+                <div class="relative flex-grow max-w-lg">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" placeholder="Buscar por Nombre, DNI o Programa..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input type="date" id="filter-date-start" title="Fecha Inicio"
+                        class="px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    
+                    <input type="date" id="filter-date-end" title="Fecha Fin"
+                        class="px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
+
+                    <select id="filter-program" 
+                        class="px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="">Todos los Programas</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center space-x-2 justify-end">
+                    <button onclick="resetFilters()" title="Limpiar Filtros"
+                        class="p-2.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 rounded-xl text-sm transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 transition shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-file-excel text-sm"></i>
+                        <span>Exportar Excel</span>
+                    </button>
+
+                    <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 transition">
+                        <i class="fa-solid fa-print text-sm"></i>
+                        <span>Imprimir</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden print-table">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/80 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-700/80">
+                            <th class="py-4 px-6 font-semibold">Estudiante</th>
+                            <th class="py-4 px-6 font-semibold">DNI</th>
+                            <th class="py-4 px-6 font-semibold">Programa de Estudios</th>
+                            <th class="py-4 px-6 font-semibold">Fecha</th>
+                            <th class="py-4 px-6 font-semibold">Hora</th>
+                            <th class="py-4 px-6 font-semibold text-center">Estado</th>
+                            <th class="py-4 px-6 font-semibold text-right no-print">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-table-body" class="divide-y divide-slate-700/50 text-sm">
+                        <tr>
+                            <td colspan="7" class="py-12 text-center text-slate-400">
+                                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-500 mb-3"></i>
+                                <p>Cargando registros de asistencia...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-slate-900/60 px-6 py-3.5 border-t border-slate-700/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 no-print">
+                <span id="records-counter-info">Mostrando 0 registros</span>
+                <span class="mt-2 sm:mt-0">CETPRO "Gabriela" - Sistema Integrado de Control</span>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500 no-print">
+        <p>&copy; 2026 CETPRO Gabriela. Todos los derechos reservados.</p>
+    </footer>
+
+    <div id="manualModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 relative">
+            <button onclick="closeManualRegisterModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="flex items-center space-x-3 mb-5">
+                <div class="p-2.5 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-xl">
+                    <i class="fa-solid fa-user-plus text-lg"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white">Registro Manual de Asistencia</h3>
+            </div>
+
+            <form id="manual-register-form" onsubmit="handleManualSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">DNI Estudiante</label>
+                    <input type="text" id="manual-dni" maxlength="8" required placeholder="Ingrese DNI (8 dígitos)"
+                        class="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Estado de Asistencia</label>
+                    <select id="manual-status" class="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="ASISTIO">ASISTIÓ (Puntual)</option>
+                        <option value="TARDANZA">TARDANZA</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Observaciones (Opcional)</label>
+                    <textarea id="manual-obs" rows="2" placeholder="Motivo o detalle adicional..."
+                        class="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                </div>
+
+                <div class="flex items-center space-x-3 pt-3">
+                    <button type="button" onclick="closeManualRegisterModal()" class="w-1/2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold rounded-xl transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-save-manual" class="w-1/2 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-sky-600/30 transition">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            deleteDoc, 
+            doc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyABgLKby-CmtgBxyKkyAz2B9SiuVPXwixE",
+    authDomain: "cetpro-firebase-gabriela.firebaseapp.com",
+    projectId: "cetpro-firebase-gabriela",
+    storageBucket: "cetpro-firebase-gabriela.firebasestorage.app",
+    messagingSenderId: "274943270322",
+    appId: "1:274943270322:web:2c9ccd8f5cdc9d0f6b58ab"        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let rawAttendanceList = [];
+        let studentsCache = new Map();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setupRealtimeListeners();
+            setupFilterListeners();
+        });
+
+        function setupRealtimeListeners() {
+            onSnapshot(collection(db, "alumnos"), (snapshot) => {
+                studentsCache.clear();
+                const programSet = new Set();
+                
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data.dni) {
+                        studentsCache.set(data.dni.toString().trim(), {
+                            nombre: data.nombre || data.nombreCompleto || 'Sin Nombre',
+                            programa: data.programa || data.carrera || 'Programa General'
+                        });
+                        if (data.programa) programSet.add(data.programa);
+                    }
+                });
+
+                updateProgramDropdown(Array.from(programSet));
+                renderTable();
+            }, (error) => {
+                console.warn("Advertencia al cargar la colección alumnos:", error);
+            });
+
+            onSnapshot(collection(db, "asistencias"), (snapshot) => {
+                rawAttendanceList = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    let dateObj = new Date();
+                    if (data.timestamp && data.timestamp.toDate) {
+                        dateObj = data.timestamp.toDate();
+                    } else if (data.fecha) {
+                        dateObj = new Date(data.fecha + (data.hora ? 'T' + data.hora : ''));
+                    }
+
+                    rawAttendanceList.push({
+                        id: docSnap.id,
+                        dni: data.dni ? data.dni.toString().trim() : '',
+                        nombre: data.nombre || '',
+                        programa: data.programa || '',
+                        fechaRaw: dateObj,
+                        fechaStr: dateObj.toISOString().split('T')[0],
+                        horaStr: data.hora || dateObj.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                        estado: data.estado || 'ASISTIO'
+                    });
+                });
+
+                rawAttendanceList.sort((a, b) => b.fechaRaw - a.fechaRaw);
+                updateCounters();
+                renderTable();
+            }, (error) => {
+                showToast("Error de conexión con Firestore asistencias.", "error");
+                document.getElementById('connection-status').textContent = "Modo Desconectado";
+                document.getElementById('connection-status').previousElementSibling.className = "inline-block w-2 h-2 rounded-full bg-red-500";
+            });
+        }
+
+        function maskDNI(dni) {
+            if (!dni) return "********";
+            const str = dni.toString().trim();
+            if (str.length < 8) return str;
+            return `${str.substring(0, 2)}***${str.substring(5)}`;
+        }
+
+        window.renderTable = function() {
+            const tbody = document.getElementById('attendance-table-body');
+            const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+            const startDate = document.getElementById('filter-date-start').value;
+            const endDate = document.getElementById('filter-date-end').value;
+            const selectedProg = document.getElementById('filter-program').value;
+
+            const filtered = rawAttendanceList.filter(item => {
+                const studentInfo = studentsCache.get(item.dni) || {};
+                const fullName = (item.nombre || studentInfo.nombre || 'No Registrado').toLowerCase();
+                const programName = (item.programa || studentInfo.programa || 'General').toLowerCase();
+                const dniVal = item.dni.toLowerCase();
+
+                const matchesSearch = !searchVal || 
+                    fullName.includes(searchVal) || 
+                    dniVal.includes(searchVal) || 
+                    programName.includes(searchVal);
+
+                const matchesProgram = !selectedProg || (item.programa || studentInfo.programa) === selectedProg;
+
+                let matchesDate = true;
+                if (startDate && item.fechaStr < startDate) matchesDate = false;
+                if (endDate && item.fechaStr > endDate) matchesDate = false;
+
+                return matchesSearch && matchesProgram && matchesDate;
+            });
+
+            document.getElementById('records-counter-info').textContent = `Mostrando ${filtered.length} de ${rawAttendanceList.length} registros`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-10 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600 block"></i>
+                            No se encontraron registros de asistencia correspondientes.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(item => {
+                const student = studentsCache.get(item.dni) || {};
+                const nameDisplay = item.nombre || student.nombre || 'Estudiante Desconocido';
+                const programDisplay = item.programa || student.programa || 'Programa General';
+                const masked = maskDNI(item.dni);
+                const isTardanza = item.estado.toUpperCase() === 'TARDANZA';
+
+                return `
+                    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/40">
+                        <td class="py-3.5 px-6 font-medium text-slate-100 flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-xs text-sky-400 font-bold shrink-0">
+                                ${nameDisplay.charAt(0).toUpperCase()}
+                            </div>
+                            <span class="truncate max-w-xs">${nameDisplay}</span>
+                        </td>
+                        <td class="py-3.5 px-6 font-mono text-slate-300">${masked}</td>
+                        <td class="py-3.5 px-6 text-slate-300">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
+                                ${programDisplay}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-300 whitespace-nowrap">${item.fechaStr}</td>
+                        <td class="py-3.5 px-6 font-mono text-slate-400 text-xs">${item.horaStr}</td>
+                        <td class="py-3.5 px-6 text-center whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                isTardanza 
+                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' 
+                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            }">
+                                <i class="fa-solid ${isTardanza ? 'fa-clock' : 'fa-check'} mr-1.5"></i>
+                                ${isTardanza ? 'Tardanza' : 'Asisti&oacute;'}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-6 text-right no-print">
+                            <button onclick="deleteAttendanceRecord('${item.id}')" title="Eliminar Registro" class="text-slate-500 hover:text-red-400 p-1.5 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        function updateCounters() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const total = rawAttendanceList.length;
+            const todayCount = rawAttendanceList.filter(r => r.fechaStr === todayStr).length;
+            const tardanzasToday = rawAttendanceList.filter(r => r.fechaStr === todayStr && r.estado.toUpperCase() === 'TARDANZA').length;
+            
+            const activePrograms = new Set();
+            rawAttendanceList.forEach(r => {
+                const prog = r.programa || (studentsCache.get(r.dni) || {}).programa;
+                if (prog) activePrograms.add(prog);
+            });
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-today').textContent = todayCount;
+            document.getElementById('stat-tardanzas').textContent = tardanzasToday;
+            document.getElementById('stat-programas').textContent = activePrograms.size;
+        }
+
+        function updateProgramDropdown(programs) {
+            const select = document.getElementById('filter-program');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">Todos los Programas</option>';
+            
+            programs.forEach(prog => {
+                const opt = document.createElement('option');
+                opt.value = prog;
+                opt.textContent = prog;
+                select.appendChild(opt);
+            });
+            select.value = currentVal;
+        }
+
+        function setupFilterListeners() {
+            document.getElementById('search-input').addEventListener('input', renderTable);
+            document.getElementById('filter-date-start').addEventListener('change', renderTable);
+            document.getElementById('filter-date-end').addEventListener('change', renderTable);
+            document.getElementById('filter-program').addEventListener('change', renderTable);
+        }
+
+        window.resetFilters = function() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-date-start').value = '';
+            document.getElementById('filter-date-end').value = '';
+            document.getElementById('filter-program').value = '';
+            renderTable();
+            showToast("Filtros restablecidos", "info");
+        };
+
+        window.exportToExcel = function() {
+            if (rawAttendanceList.length === 0) {
+                showToast("No hay registros para exportar", "warning");
+                return;
+            }
+
+            const exportData = rawAttendanceList.map(item => {
+                const student = studentsCache.get(item.dni) || {};
+                return {
+                    'Estudiante': item.nombre || student.nombre || 'No Registrado',
+                    'DNI Oculto': maskDNI(item.dni),
+                    'Programa de Estudios': item.programa || student.programa || 'Programa General',
+                    'Fecha': item.fechaStr,
+                    'Hora': item.horaStr,
+                    'Estado': item.estado
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencias CETPRO");
+            
+            const max_width = exportData.reduce((w, r) => Math.max(w, r['Estudiante'].length), 10);
+            worksheet['!cols'] = [
+                { wch: max_width + 5 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 12 }
+            ];
+
+            XLSX.writeFile(workbook, `Listado_Asistencia_CETPRO_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showToast("Archivo Excel descargado con éxito", "success");
+        };
+
+        window.deleteAttendanceRecord = async function(id) {
+            if (confirm("¿Está seguro de eliminar este registro de asistencia?")) {
+                try {
+                    await deleteDoc(doc(db, "asistencias", id));
+                    showToast("Registro eliminado correctamente", "success");
+                } catch (error) {
+                    showToast("Error al eliminar el registro", "error");
+                }
+            }
+        };
+
+        window.openManualRegisterModal = function() {
+            document.getElementById('manualModal').classList.remove('hidden');
+        };
+
+        window.closeManualRegisterModal = function() {
+            document.getElementById('manualModal').classList.add('hidden');
+            document.getElementById('manual-register-form').reset();
+        };
+
+        window.handleManualSubmit = async function(event) {
+            event.preventDefault();
+            const dni = document.getElementById('manual-dni').value.trim();
+            const estado = document.getElementById('manual-status').value;
+            const obs = document.getElementById('manual-obs').value;
+
+            if (!dni || dni.length < 8) {
+                showToast("Por favor ingrese un DNI válido (8 dígitos)", "warning");
+                return;
+            }
+
+            const student = studentsCache.get(dni) || {};
+            const now = new Date();
+
+            try {
+                await addDoc(collection(db, "asistencias"), {
+                    dni: dni,
+                    nombre: student.nombre || 'Registrado Manualmente',
+                    programa: student.programa || 'General',
+                    fecha: now.toISOString().split('T')[0],
+                    hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    estado: estado,
+                    observacion: obs,
+                    timestamp: serverTimestamp()
+                });
+
+                showToast("Asistencia registrada exitosamente", "success");
+                closeManualRegisterModal();
+            } catch (error) {
+                showToast("Error al registrar asistencia manual", "error");
+            }
+        };
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-red-600 text-white',
+                warning: 'bg-amber-600 text-white',
+                info: 'bg-sky-600 text-white'
+            };
+
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-triangle-exclamation',
+                warning: 'fa-circle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `flex items-center space-x-3 px-4 py-3 rounded-xl shadow-xl transition-all transform translate-y-2 opacity-0 pointer-events-auto ${bgColors[type] || bgColors.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type] || icons.info}"></i>
+                <span class="text-sm font-medium">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
